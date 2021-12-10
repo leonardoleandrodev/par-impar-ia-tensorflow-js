@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste TensorFlow</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js" integrity="sha384-QJHtvGhmr9XOIpI6YVutG+2QOK9T+ZnN4kzFN1RtK3zEFEIsxhlmWl5/YESvpZ13" crossorigin="anonymous"></script>
+</head>
+<style>
+body {
+  font-family: 'Tahoma', sans-serif !important;
+  font-size: 0.9rem;
+}
+</style>
+<body class="col-12 bg-body p-3 m-3">
+    <section class="col-12 m-0 p-0">
+        <div class="col-3 my-auto mx-auto p-2 card">
+            <div class="input-group input-group-sm mb-3">
+                <span class="input-group-text" id="inputGroup-sizing-sm">Digite o Número</span>
+                <input type="number"class="form-control"  name="numero" id="numero" min=0 max="2147483647" value=0 placeholder="Valor">
+                <input type="button" class="form-control" onclick="tf.io.removeModel('localstorage://my-model-1');" value=Clear placeholder="Valor">
+            </div>
+            <div class="col-12 text-center">
+                <div class="result ">Digite o número para analizar...</div>
+            </div>
+            <div class="col-12 d-inline text-center">
+                <div class="par col-12 bg-success text-white p-0 m-0 d-none">PAR</div>
+                <div class="impar col-12 bg-success text-white p-0 m-0 d-none">ÍMPAR</div>
+            </div>
+        </div>
+    </section>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.12.0/dist/tf.min.js"></script>
+<script>
+document.querySelector("#numero").addEventListener('change',teste);
+
+var xk = [];
+var yk = [];
+var tm = null;
+var res = null;
+function to8Bits(numString){
+    return ("00000000" + (numString).toString(2)).slice(-8).split('').map(n=>parseInt(n))
+}
+function to32Bits(numString){
+    return ("00000000000000000000000000000000" + (numString).toString(2)).slice(-32).split('').map(n=>parseInt(n))
+}
+function test2(){
+    const features =
+[
+ [5.1, 3.5, 1.4, 0.2],
+ [4.9, 3.0, 1.4, 0.2],
+ [6.6, 2.9, 4.6, 1.3],
+ [6.3, 2.5, 5.0, 1.9]
+]
+const labels = 
+[ 
+ [0],
+ [0],
+ [1],
+ [2]
+]
+console.log(createDataset(features, labels, 5));
+}
+function onBatchEnd(batch, logs) {
+    document.querySelector(".result").classList.remove("text-center");
+    document.querySelector(".result").innerText = `Precisão  b${logs.batch} l${logs.loss} s${logs.size} a${logs.binaryAccuracy}\n`;
+}
+function  teste(){
+
+tm = Date.now();
+res =  document.querySelector(".result");
+var numVal =  document.querySelector("#numero").value;
+const model = tf.sequential();
+document.querySelector(".par").classList.remove("d-inline-block");
+document.querySelector(".impar").classList.remove("d-inline-block");
+document.querySelector(".impar").classList.add("d-none");
+document.querySelector(".par").classList.add("d-none");
+res.setAttribute("class","text-primary result");
+res.innerHTML = "Processando..."
+// Input data
+// Array of days, and their capacity used out of 
+// 100% for 5 hour period
+var xs = [];
+var ys = [];
+
+for (let x = 0; x < 2048; x++) {
+    xs.push(to32Bits(x));
+    ys.push([parseInt((x%2).toString(2))]);
+}
+//console.log(xs,ys);
+xs = tf.tensor(xs);
+ys = tf.tensor(ys);
+const pred = tf.tensor([to32Bits(parseInt(numVal))],[1,32]);
+//xs.print();
+//ys.print();
+//pred.print();
+//console.log(xs.shape,ys.shape,pred.shape);
+model.add(tf.layers.dense({units: 10, inputShape: [32] }));
+//model.add(tf.layers.dense({units: 2, inputShape: [5] }));
+model.add(tf.layers.dense({units: 1, inputShape: [10] }));
+model.compile({
+   loss: 'binaryCrossentropy',
+   optimizer: 'adam',
+   metrics:"binaryAccuracy"
+});
+preditar(xs,ys,model,pred).then(m=>console.log(m));
+
+}
+async function preditar(xs,ys,model,pred){
+    console.log("aqui");
+    var loadedModel = null;
+    try {
+        loadedModel = await tf.loadLayersModel('localstorage://my-model-1');
+    } catch (error) {
+        console.log(error);
+    }
+    
+    console.log("depois aqui" + loadedModel);
+    var result = null;
+    
+    if(loadedModel === null){
+        model.fit(xs, ys,{epochs:150,batchSize: 25,callbacks: {onBatchEnd}}).then(info => {
+            
+            mostraResultado(model.predict(pred).dataSync());
+            model.save('localstorage://my-model-1');
+        
+        }).catch((e) => {
+        console.log(e.message);
+        //res.innerHTML = e.message;
+        });
+       
+    }else{
+        mostraResultado(loadedModel.predict(pred).dataSync());
+    }
+    return model;
+}
+function mostraResultado(resPred){
+    if(resPred < 0.5){
+            document.querySelector(".par").classList.remove("d-none");
+            document.querySelector(".impar").classList.remove("d-inline-block");
+            document.querySelector(".impar").classList.add("d-none");
+            document.querySelector(".par").classList.add("d-inline-block");
+            }else{  
+                document.querySelector(".impar").classList.remove("d-none");
+                document.querySelector(".par").classList.remove("d-inline-block");
+                document.querySelector(".par").classList.add("d-none");
+                document.querySelector(".impar").classList.add("d-inline-block");
+            }
+            var tmres = (Date.now()-tm)
+            res.innerHTML = resPred > 0.5?"Ímpar (" + resPred + ")" :"Par (" + resPred + ")";
+            res.innerHTML += " " +  tmres + "ms";
+            res.setAttribute("class","text-success result");
+}
+</script>
+</html>

@@ -62,9 +62,11 @@ res.innerHTML = "Processando..."
 var xs = [];
 var ys = [];
 
-for (let x = 0; x < 2048; x++) {
-    xs.push(dec2bin(x));
-    ys.push([parseInt((x%2).toString(2))]);
+for (let x = 0; x < 2000; x++) {
+    let v = parseInt((Math.random() * (99999999999999999999 - 0) + 0) * 0.0001);
+    console.log(v)
+    xs.push(dec2bin(v));
+    ys.push([parseInt((v%2).toString(2))]);
 }
 console.log(xs,ys);
 xs = tf.tensor(xs);
@@ -72,8 +74,8 @@ ys = tf.tensor(ys);
 
 let nBin = dec2bin(parseInt(numVal));
 const pred = tf.tensor(nBin,[1,nBin.length]);
-model.add(tf.layers.dense({units: 10, inputShape: [nBin.length] }));
-model.add(tf.layers.dense({units: 1, inputShape: [10] }));
+model.add(tf.layers.dense({units: 5, inputShape: [nBin.length] }));
+model.add(tf.layers.dense({units: 1, inputShape: [5] }));
 model.compile({
    loss: 'binaryCrossentropy',
    optimizer: 'adam',

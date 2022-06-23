@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -16,7 +16,7 @@ body {
 </style>
 <body class="col-12 bg-body p-3 m-3">
     <section class="col-12 m-0 p-0">
-        <div class="col-3 my-auto mx-auto p-2 card">
+        <div class="col-3 col-sm-12 col-md-8 col-xl-3 my-auto mx-auto p-2 card">
             <div class="input-group input-group-sm mb-3">
                 <span class="input-group-text" id="inputGroup-sizing-sm">Digite o Número</span>
                 <input type="number"class="form-control"  name="numero" id="numero" min=0 max="2147483647" value=0 placeholder="Valor">
@@ -40,29 +40,8 @@ var xk = [];
 var yk = [];
 var tm = null;
 var res = null;
-function to8Bits(numString){
-    return ("00000000" + (numString).toString(2)).slice(-8).split('').map(n=>parseInt(n))
-}
-function to32Bits(numString){
-    return ("00000000000000000000000000000000" + (numString).toString(2)).slice(-32).split('').map(n=>parseInt(n))
-}
-function test2(){
-    const features =
-[
- [5.1, 3.5, 1.4, 0.2],
- [4.9, 3.0, 1.4, 0.2],
- [6.6, 2.9, 4.6, 1.3],
- [6.3, 2.5, 5.0, 1.9]
-]
-const labels = 
-[ 
- [0],
- [0],
- [1],
- [2]
-]
-console.log(createDataset(features, labels, 5));
-}
+const bitSize = 64;
+
 function onBatchEnd(batch, logs) {
     document.querySelector(".result").classList.remove("text-center");
     document.querySelector(".result").innerText = `Precisão  b${logs.batch} l${logs.loss} s${logs.size} a${logs.binaryAccuracy}\n`;
@@ -79,59 +58,60 @@ document.querySelector(".impar").classList.add("d-none");
 document.querySelector(".par").classList.add("d-none");
 res.setAttribute("class","text-primary result");
 res.innerHTML = "Processando..."
-// Input data
-// Array of days, and their capacity used out of 
-// 100% for 5 hour period
+
 var xs = [];
 var ys = [];
 
 for (let x = 0; x < 2048; x++) {
-    xs.push(to32Bits(x));
+    xs.push(dec2bin(x));
     ys.push([parseInt((x%2).toString(2))]);
 }
-//console.log(xs,ys);
+console.log(xs,ys);
 xs = tf.tensor(xs);
 ys = tf.tensor(ys);
-const pred = tf.tensor([to32Bits(parseInt(numVal))],[1,32]);
-//xs.print();
-//ys.print();
-//pred.print();
-//console.log(xs.shape,ys.shape,pred.shape);
-model.add(tf.layers.dense({units: 10, inputShape: [32] }));
-//model.add(tf.layers.dense({units: 2, inputShape: [5] }));
+
+let nBin = dec2bin(parseInt(numVal));
+const pred = tf.tensor(nBin,[1,nBin.length]);
+model.add(tf.layers.dense({units: 10, inputShape: [nBin.length] }));
 model.add(tf.layers.dense({units: 1, inputShape: [10] }));
 model.compile({
    loss: 'binaryCrossentropy',
    optimizer: 'adam',
    metrics:"binaryAccuracy"
 });
+console.log('predict');
 preditar(xs,ys,model,pred).then(m=>console.log(m));
 
 }
 async function preditar(xs,ys,model,pred){
-    console.log("aqui");
+    let continuar = false;
     var loadedModel = null;
     try {
-        loadedModel = await tf.loadLayersModel('localstorage://my-model-1');
+        loadedModel = await tf.loadLayersModel('localstorage://my-model-1').then((lm)=>{
+            console.log('continuar...',continuar);
+            continuar = true;
+            return lm;
+        });
     } catch (error) {
         console.log(error);
+        continuar = true;
     }
-    
-    console.log("depois aqui" + loadedModel);
+    while (continuar == false) {
+        console.log("carregando model");  
+    }
     var result = null;
-    
     if(loadedModel === null){
-        model.fit(xs, ys,{epochs:150,batchSize: 25,callbacks: {onBatchEnd}}).then(info => {
+        
+        model.fit(xs, ys,{epochs:50,batchSize: 10,callbacks: {onBatchEnd}}).then(info => {
             
-            mostraResultado(model.predict(pred).dataSync());
             model.save('localstorage://my-model-1');
+            mostraResultado(model.predict(pred).dataSync());
         
         }).catch((e) => {
-        console.log(e.message);
-        //res.innerHTML = e.message;
+
         });
        
-    }else{
+    }else{        
         mostraResultado(loadedModel.predict(pred).dataSync());
     }
     return model;
@@ -152,6 +132,10 @@ function mostraResultado(resPred){
             res.innerHTML = resPred > 0.5?"Ímpar (" + resPred + ")" :"Par (" + resPred + ")";
             res.innerHTML += " " +  tmres + "ms";
             res.setAttribute("class","text-success result");
+}
+function dec2bin(dec) {    
+    let result = ("0".repeat(bitSize) + (dec >>> 0).toString(2)).slice(-bitSize).split('').map(n=>parseInt(n));
+    return result;
 }
 </script>
 </html>
